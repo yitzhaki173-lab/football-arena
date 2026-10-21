@@ -28,6 +28,8 @@ interface Puzzle {
 
 const DECOYS: Record<Level, number> = { medium: 4, hard: 6, expert: 8 }
 const BRUSH: Record<Level, number> = { medium: 0.075, hard: 0.055, expert: 0.04 }
+/** Scratching pauses after every STEP percent until the player taps release. */
+const STEP = 5
 
 function buildPuzzle(name: string, level: Level, rand: () => number): Puzzle {
   const slots: Slot[] = []
@@ -64,6 +66,7 @@ export function Scratch({ config, items, seed, onDone, onProgress, onQuit }: Gam
   const [i, setI] = useState(0)
   const [slots, setSlots] = useState<Slot[]>(() => puzzles[0]?.puzzle.slots ?? [])
   const [pct, setPct] = useState(0)
+  const [allow, setAllow] = useState(STEP)
   const [helps, setHelps] = useState(0)
   const [done, setDone] = useState<null | 'ok' | 'skip' | 'time'>(null)
   const [shake, setShake] = useState(false)
@@ -177,6 +180,7 @@ export function Scratch({ config, items, seed, onDone, onProgress, onQuit }: Gam
     setSlots(puzzles[i + 1].puzzle.slots)
     setHelps(0)
     setPct(0)
+    setAllow(STEP)
     setDone(null)
   }
 
@@ -186,6 +190,7 @@ export function Scratch({ config, items, seed, onDone, onProgress, onQuit }: Gam
     ;(words[s.word] ??= []).push({ slot: s, k })
   })
   const worth = scratchPoints(pct, helps)
+  const locked = !done && pct >= allow && allow < 100
 
   return (
     <div className="screen full">
@@ -193,7 +198,12 @@ export function Scratch({ config, items, seed, onDone, onProgress, onQuit }: Gam
       <div className={`scratch-wrap${!done && e.level === 'expert' ? ' gray' : ''}`}>
         <img className="bg" src={e.img} alt="" draggable={false} />
         <img className="fg" src={e.img} alt="" draggable={false} style={done ? { transition: 'transform .6s, filter .6s' } : pz.frame} />
-        <ScratchCanvas brush={BRUSH[e.level]} onReveal={setPct} disabled={!!done} cleared={!!done} resetKey={i} />
+        <ScratchCanvas brush={BRUSH[e.level]} onReveal={setPct} disabled={!!done} cleared={!!done} resetKey={i} limit={allow} />
+        {locked && (
+          <button className="btn primary scratch-release" onClick={() => setAllow(Math.min(100, allow + STEP))}>
+            🔓 שחרר עוד {STEP}%
+          </button>
+        )}
       </div>
       <div className="row">
         <div className="reveal-meter grow">

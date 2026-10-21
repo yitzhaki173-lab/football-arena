@@ -1,11 +1,12 @@
-import { useEffect, useRef, type PointerEvent as RPointerEvent } from 'react'
+import { useLayoutEffect, useRef, type PointerEvent as RPointerEvent } from 'react'
 
 const GRID = 40
 
 /**
  * An opaque layer over the picture. Dragging a finger erases a circle under it.
  * Revealed area is measured on a fixed grid over the picture, so screen size
- * and finger width don't change the percentage.
+ * and finger width don't change the percentage. Scratching stops once `limit`
+ * percent is open, until the parent raises it.
  */
 export function ScratchCanvas({
   brush,
@@ -13,6 +14,7 @@ export function ScratchCanvas({
   disabled,
   cleared,
   resetKey,
+  limit,
 }: {
   /** Brush radius as a fraction of the picture width. */
   brush: number
@@ -20,6 +22,7 @@ export function ScratchCanvas({
   disabled: boolean
   cleared: boolean
   resetKey: unknown
+  limit: number
 }) {
   const ref = useRef<HTMLCanvasElement>(null)
   const cells = useRef<Uint8Array>(new Uint8Array(GRID * GRID))
@@ -27,8 +30,11 @@ export function ScratchCanvas({
   const last = useRef<{ x: number; y: number } | null>(null)
   const revealCb = useRef(onReveal)
   revealCb.current = onReveal
+  const limitRef = useRef(limit)
+  limitRef.current = limit
 
-  useEffect(() => {
+  // layout effect: the cover is painted before the browser shows the new picture
+  useLayoutEffect(() => {
     const c = ref.current
     if (!c) return
     const paint = () => {
@@ -114,7 +120,8 @@ export function ScratchCanvas({
     const from = last.current ?? p
     const dist = Math.hypot(p.x - from.x, p.y - from.y)
     const steps = Math.max(1, Math.ceil(dist / (brush * 0.5)))
-    for (let s = 1; s <= steps; s++) stamp(from.x + ((p.x - from.x) * s) / steps, from.y + ((p.y - from.y) * s) / steps)
+    const max = (limitRef.current / 100) * GRID * GRID
+    for (let s = 1; s <= steps && count.current < max; s++) stamp(from.x + ((p.x - from.x) * s) / steps, from.y + ((p.y - from.y) * s) / steps)
     last.current = p
     revealCb.current((100 * count.current) / (GRID * GRID))
   }
@@ -122,7 +129,8 @@ export function ScratchCanvas({
   return (
     <canvas
       ref={ref}
-      style={{ opacity: cleared ? 0 : 1, transition: 'opacity .6s', pointerEvents: disabled ? 'none' : 'auto' }}
+      // fade out on reveal only: fading back in would show the next picture for a moment
+      style={{ opacity: cleared ? 0 : 1, transition: cleared ? 'opacity .6s' : 'none', pointerEvents: disabled ? 'none' : 'auto' }}
       onPointerDown={(e) => {
         ;(e.target as HTMLCanvasElement).setPointerCapture(e.pointerId)
         last.current = null

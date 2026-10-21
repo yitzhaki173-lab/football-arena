@@ -52,6 +52,8 @@ export interface GameConfig {
   count: number
   seconds: number
   scratchKind?: 'player' | 'team' | 'mixed'
+  /** Tournament only: the games its rounds rotate through. */
+  modes?: GameMode[]
 }
 
 export interface GameResult {

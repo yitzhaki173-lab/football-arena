@@ -22,12 +22,13 @@ import {
   reportProgress,
   setCustomPuzzle,
   startRound,
+  TOURNAMENT_MODES,
   updateRoomConfig,
   watchDisconnect,
   type JoinResult,
 } from '../net/room'
 import type { RoomKind, RoomPlayer, RoomState } from '../net/types'
-import type { GameConfig, Level, TopicId } from '../types'
+import type { GameConfig, GameMode, Level, TopicId } from '../types'
 import { useNav } from '../nav'
 import { TopBar, toast } from '../components/ui'
 import { ConfigForm, TopicPicker, defaultConfig } from './Setup'
@@ -159,7 +160,7 @@ export function RoomCreate({ tournament, duel, challenge }: { tournament?: boole
         </div>
       </div>
       {kind === 'tournament' ? (
-        <TournamentForm topics={cfg.topics} level={cfg.level} onChange={(topics, level) => setCfg({ ...cfg, topics, level })} />
+        <TournamentForm topics={cfg.topics} level={cfg.level} modes={cfg.modes ?? TOURNAMENT_MODES} onChange={(topics, level, modes) => setCfg({ ...cfg, topics, level, modes })} />
       ) : (
         <ConfigForm value={cfg} onChange={setCfg} lockMode={false} />
       )}
@@ -171,21 +172,45 @@ export function RoomCreate({ tournament, duel, challenge }: { tournament?: boole
   )
 }
 
-function TournamentForm({ topics, level, onChange }: { topics: TopicId[]; level: Level; onChange: (t: TopicId[], l: Level) => void }) {
+function TournamentForm({
+  topics,
+  level,
+  modes,
+  onChange,
+}: {
+  topics: TopicId[]
+  level: Level
+  modes: GameMode[]
+  onChange: (t: TopicId[], l: Level, m: GameMode[]) => void
+}) {
+  const toggle = (m: GameMode) => {
+    const next = modes.includes(m) ? modes.filter((x) => x !== m) : [...modes, m]
+    if (next.length) onChange(topics, level, next)
+  }
   return (
     <div className="col" style={{ gap: 14 }}>
       <div className="card muted small" style={{ lineHeight: 1.6 }}>
-        כל סבב במצב אחר: טריוויה, מי השחקן, גירוד ומשחק מהיר. בסוף כל סבב המקום האחרון יוצא, עד גמר של שניים בטריוויה. כל סבב שווה אותו דבר, כך שאף מצב לא מכריע לבד.
+        כל סבב במשחק אחר מתוך המשחקים שבחרתם. בסוף כל סבב המקום האחרון יוצא, עד גמר של שניים (בטריוויה, אם היא נבחרה). כל סבב שווה אותו דבר, כך שאף משחק לא מכריע לבד.
+      </div>
+      <div>
+        <div className="label">משחקים בטורניר · אפשר לסמן כמה</div>
+        <div className="chips">
+          {TOURNAMENT_MODES.map((m) => (
+            <button key={m} className={`chip ${modes.includes(m) ? 'on' : ''}`} onClick={() => toggle(m)}>
+              {modeName(m)}
+            </button>
+          ))}
+        </div>
       </div>
       <div>
         <div className="label">נושאים · אפשר לסמן כמה</div>
-        <TopicPicker compact value={topics} onChange={(t) => onChange(t, level)} />
+        <TopicPicker compact value={topics} onChange={(t) => onChange(t, level, modes)} />
       </div>
       <div>
         <div className="label">רמה</div>
         <div className="chips">
           {LEVELS.map((l) => (
-            <button key={l.id} className={`chip ${level === l.id ? 'on' : ''}`} onClick={() => onChange(topics, l.id)}>
+            <button key={l.id} className={`chip ${level === l.id ? 'on' : ''}`} onClick={() => onChange(topics, l.id, modes)}>
               {l.name}
             </button>
           ))}
@@ -387,6 +412,7 @@ function Lobby({ room, hasScratch, onQuit }: { room: RoomState; hasScratch: bool
             </button>
           )}
         </div>
+        {room.kind === 'tournament' && <div className="muted small">משחקים: {(room.config.modes ?? TOURNAMENT_MODES).map(modeName).join(', ')}</div>}
         {room.custom && <div className="muted small">🖼️ חידה אישית מוכנה לסבב הגירוד</div>}
       </div>
       {editing && (

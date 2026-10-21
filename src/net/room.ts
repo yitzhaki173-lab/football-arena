@@ -62,14 +62,24 @@ function newCode(): string {
   return String(Math.floor(100000 + Math.random() * 900000))
 }
 
-/** Round plan for a tournament: one player out per round until a final of two. */
-export function tournamentPlan(players: number, topics: TopicId[], level: Level, hasScratch: boolean): GameConfig[] {
+export const TOURNAMENT_MODES: GameMode[] = ['trivia', 'who', 'scratch', 'quick']
+
+/**
+ * Round plan for a tournament: one player out per round until a final of two.
+ * The final is trivia when it was picked; the rounds before it rotate through the
+ * other picked games from a random start, so with few players every game still gets its turn.
+ */
+export function tournamentPlan(players: number, topics: TopicId[], level: Level, hasScratch: boolean, modes = TOURNAMENT_MODES): GameConfig[] {
   const rounds = Math.max(1, players - 1)
-  const cycle: GameMode[] = hasScratch ? ['trivia', 'who', 'scratch', 'quick'] : ['trivia', 'who', 'quick']
+  let picked = TOURNAMENT_MODES.filter((m) => modes.includes(m) && (m !== 'scratch' || hasScratch))
+  if (!picked.length) picked = ['trivia']
+  const final: GameMode = picked.includes('trivia') ? 'trivia' : picked[picked.length - 1]
+  const others = picked.length > 1 ? picked.filter((m) => m !== final) : picked
+  const start = Math.floor(Math.random() * others.length)
   const plan: GameConfig[] = []
   for (let r = 0; r < rounds; r++) {
     const isFinal = r === rounds - 1
-    const mode = isFinal ? 'trivia' : cycle[r % cycle.length]
+    const mode = isFinal ? final : others[(start + r) % others.length]
     const base: GameConfig =
       mode === 'who'
         ? { mode, topics, level, count: 3, seconds: 45 }
@@ -168,7 +178,7 @@ export async function startRound(room: RoomState, hasScratch: boolean) {
   let config = room.config
   let plan = room.plan
   if (room.kind === 'tournament') {
-    if (!plan || room.round === 0) plan = tournamentPlan(activePlayers(room).length, room.config.topics, room.config.level, hasScratch)
+    if (!plan || room.round === 0) plan = tournamentPlan(activePlayers(room).length, room.config.topics, room.config.level, hasScratch, room.config.modes)
     config = plan[Math.min(round - 1, plan.length - 1)]
   }
   const useCustom = !!room.custom && config.mode === 'scratch'
