@@ -1,7 +1,7 @@
 import type { RoomState, RoomTransport } from './types'
 
 export interface FirebaseWebConfig {
-  apiKey: string
+  apiKey?: string
   authDomain?: string
   databaseURL: string
   projectId: string
