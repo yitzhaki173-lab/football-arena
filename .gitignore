@@ -1,0 +1,6 @@
+node_modules/
+dist/
+*.tsbuildinfo
+# The original photos still show names; only the masked WebP copies in public/ are published.
+content-src/players-src/
+__pycache__/
