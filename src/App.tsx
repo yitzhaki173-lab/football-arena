@@ -10,7 +10,7 @@ import { Onboarding } from './screens/Onboarding'
 import { Play } from './screens/Play'
 import { Achievements, Profile, Rankings, Settings } from './screens/ProfileScreens'
 import { Results } from './screens/Results'
-import { Friends, Room, RoomCreate, RoomJoin } from './screens/Rooms'
+import { Friends, Nearby, NearbyJoin, Room, RoomCreate, RoomJoin } from './screens/Rooms'
 import { Setup } from './screens/Setup'
 
 function Screen({ route }: { route: Route }) {
@@ -42,6 +42,10 @@ function Screen({ route }: { route: Route }) {
       return <RoomJoin code={p.code} />
     case 'room':
       return <Room code={p.code} />
+    case 'nearby':
+      return <Nearby />
+    case 'nearby-join':
+      return <NearbyJoin />
     default:
       return <Home />
   }

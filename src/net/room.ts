@@ -48,6 +48,26 @@ export function getTransport(): Promise<RoomTransport | null> {
   return transport
 }
 
+/** Rooms without internet put their own transport in place; null goes back to the usual one. */
+export function setTransport(t: RoomTransport | null) {
+  const prev = nearby
+  nearby = t && (t.name === 'nearby-host' || t.name === 'nearby-guest') ? t : null
+  if (prev && prev !== t) (prev as unknown as { close(): void }).close()
+  transport = t ? Promise.resolve(t) : null
+}
+
+let nearby: RoomTransport | null = null
+
+/** 'host' or 'guest' while in a room without internet. */
+export function nearbyRole(): 'host' | 'guest' | null {
+  if (!nearby) return null
+  return nearby.name === 'nearby-host' ? 'host' : 'guest'
+}
+
+export function nearbyTransport(): RoomTransport | null {
+  return nearby
+}
+
 export async function watchDisconnect(code: string) {
   if (fbConfig) await markLeaveOnDisconnect(fbConfig, code, myId())
 }

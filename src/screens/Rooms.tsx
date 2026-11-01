@@ -17,10 +17,13 @@ import {
   leaveRoom,
   maybeEndRound,
   myId,
+  nearbyRole,
+  nearbyTransport,
   rankRound,
   reportDone,
   reportProgress,
   setCustomPuzzle,
+  setTransport,
   startRound,
   TOURNAMENT_MODES,
   updateRoomConfig,
@@ -32,6 +35,8 @@ import type { GameConfig, GameMode, Level, TopicId } from '../types'
 import { useNav } from '../nav'
 import { TopBar, toast } from '../components/ui'
 import { ConfigForm, ScratchAnswerPicker, TopicPicker, defaultConfig } from './Setup'
+import { NearbyGuest, NearbyHost, unlockLocalAddress, type Invite } from '../net/nearby'
+import { QRCode, QRScanner } from '../components/qr'
 import { GameHost } from './Play'
 
 const KIND_NAME: Record<RoomKind, string> = { room: 'חדר', tournament: 'טורניר', duel: 'ראש בראש', challenge: 'אתגר בקישור' }
@@ -66,6 +71,12 @@ export function Friends() {
         <h1>חברים</h1>
       </div>
       {ready === false && <NotReady />}
+      {!navigator.onLine && (
+        <button className="card col" style={{ textAlign: 'start' }} onClick={() => nav.go({ name: 'nearby' })}>
+          <div style={{ fontWeight: 800 }}>📡 אין אינטרנט כרגע</div>
+          <div className="muted small">אפשר לשחק יחד גם ככה: טלפונים על אותו Wi-Fi או נקודה חמה מתחברים ישירות.</div>
+        </button>
+      )}
       <div className="tiles">
         <button className="tile accent wide" onClick={() => nav.go({ name: 'room-create', params: { tournament: true } })}>
           <span className="t-icon">🏆</span>
@@ -102,6 +113,13 @@ export function Friends() {
             <div className="t-desc">כל אחד משחק מתי שנוח לו</div>
           </div>
         </button>
+        <button className="tile wide" onClick={() => nav.go({ name: 'nearby' })}>
+          <span className="t-icon">📡</span>
+          <div>
+            <div className="t-name">בלי אינטרנט</div>
+            <div className="t-desc">טלפונים ליד זה, על אותו Wi-Fi או נקודה חמה</div>
+          </div>
+        </button>
       </div>
       <div className="label">שיחקת איתם</div>
       {friends.length === 0 ? (
@@ -127,9 +145,10 @@ export function Friends() {
   )
 }
 
-export function RoomCreate({ tournament, duel, challenge }: { tournament?: boolean; duel?: boolean; challenge?: boolean }) {
+export function RoomCreate({ tournament, duel, challenge, nearby }: { tournament?: boolean; duel?: boolean; challenge?: boolean; nearby?: boolean }) {
   const nav = useNav()
-  const ready = useRoomsReady()
+  const online = useRoomsReady()
+  const ready = nearby ? true : online
   const [kind, setKind] = useState<RoomKind>(tournament ? 'tournament' : duel ? 'duel' : challenge ? 'challenge' : 'room')
   const [cfg, setCfg] = useState<GameConfig>(defaultConfig('trivia'))
   const [busy, setBusy] = useState(false)
@@ -137,6 +156,8 @@ export function RoomCreate({ tournament, duel, challenge }: { tournament?: boole
   const create = async () => {
     setBusy(true)
     try {
+      // without internet this phone keeps the room itself
+      setTransport(nearby ? new NearbyHost() : null)
       const code = await createRoom(kind, cfg)
       nav.replace({ name: 'room', params: { code } })
     } catch {
@@ -147,12 +168,12 @@ export function RoomCreate({ tournament, duel, challenge }: { tournament?: boole
 
   return (
     <div className="screen full">
-      <TopBar title="משחק עם חברים" />
+      <TopBar title={nearby ? 'משחק בלי אינטרנט' : 'משחק עם חברים'} />
       {ready === false && <NotReady />}
       <div>
         <div className="label">סוג</div>
         <div className="chips">
-          {(Object.keys(KIND_NAME) as RoomKind[]).map((k) => (
+          {(Object.keys(KIND_NAME) as RoomKind[]).filter((k) => !nearby || k !== 'challenge').map((k) => (
             <button key={k} className={`chip ${kind === k ? 'on' : ''}`} onClick={() => setKind(k)}>
               {KIND_NAME[k]}
             </button>
@@ -326,6 +347,7 @@ export function Room({ code }: { code: string }) {
   const self = room.players?.[me]
   const quit = async () => {
     await leaveRoom(code)
+    if (nearbyRole()) setTransport(null)
     nav.tab('home')
   }
 
@@ -410,13 +432,19 @@ function Lobby({ room, hasScratch, onQuit }: { room: RoomState; hasScratch: bool
   return (
     <div className="screen full">
       <TopBar title={KIND_NAME[room.kind]} onBack={onQuit} />
-      <div className="card center">
-        <div className="label">קוד החדר</div>
-        <div className="code">{room.code}</div>
-        <button className="btn" style={{ width: '100%' }} onClick={() => share(room.code, room.kind)}>
-          📲 שלח לחברים
-        </button>
-      </div>
+      {nearbyRole() === 'host' ? (
+        <NearbyInvite />
+      ) : nearbyRole() === 'guest' ? (
+        <div className="card center muted">📡 מחובר לטלפון של המארח, בלי אינטרנט</div>
+      ) : (
+        <div className="card center">
+          <div className="label">קוד החדר</div>
+          <div className="code">{room.code}</div>
+          <button className="btn" style={{ width: '100%' }} onClick={() => share(room.code, room.kind)}>
+            📲 שלח לחברים
+          </button>
+        </div>
+      )}
       <div className="card col" style={{ gap: 6 }}>
         <div className="row">
           <div className="grow" style={{ fontWeight: 700 }}>
@@ -657,6 +685,192 @@ function Finished({ room, onQuit }: { room: RoomState; onQuit: () => void }) {
       <button className="btn" onClick={() => (room.kind === 'challenge' ? nav.tab('home') : onQuit())}>
         יציאה
       </button>
+    </div>
+  )
+}
+
+/* ---------------- rooms without internet ---------------- */
+
+function NearbySteps() {
+  return (
+    <ol className="steps muted small">
+      <li>כל הטלפונים על אותו Wi-Fi. אין Wi-Fi? אחד מכם מדליק נקודה חמה והשאר מתחברים אליה, גם בלי חבילת גלישה.</li>
+      <li>אחד פותח חדר, וכל חבר לוחץ אצלו ״הצטרף לחבר״.</li>
+      <li>החבר סורק את הקוד במסך של המארח, ואז המארח סורק את הקוד שמופיע אצל החבר.</li>
+    </ol>
+  )
+}
+
+export function Nearby() {
+  const nav = useNav()
+  return (
+    <div className="screen full">
+      <TopBar title="משחק בלי אינטרנט" />
+      <div className="card col">
+        <div style={{ fontWeight: 800 }}>איך זה עובד</div>
+        <NearbySteps />
+      </div>
+      <div className="spacer" />
+      <button className="btn primary" onClick={() => nav.go({ name: 'room-create', params: { nearby: true } })}>
+        📡 פתח חדר
+      </button>
+      <button className="btn" onClick={() => nav.go({ name: 'nearby-join' })}>
+        🔗 הצטרף לחבר
+      </button>
+    </div>
+  )
+}
+
+const isInvite = (t: string) => t.startsWith('FA1~o~')
+const isReply = (t: string) => t.startsWith('FA1~a~')
+
+/** On the host's lobby: one friend at a time, a code each way. */
+function NearbyInvite() {
+  const [step, setStep] = useState<'idle' | 'prep' | 'show' | 'scan' | 'link'>('idle')
+  const invite = useRef<Invite | null>(null)
+  useEffect(() => () => invite.current?.cancel(), [])
+
+  const start = async () => {
+    setStep('prep')
+    await unlockLocalAddress()
+    try {
+      invite.current = await (nearbyTransport() as NearbyHost).invite()
+      setStep('show')
+    } catch {
+      toast('לא הצלחתי להכין קוד')
+      setStep('idle')
+    }
+  }
+  const onReply = async (text: string) => {
+    setStep('link')
+    try {
+      await invite.current!.accept(text)
+      fx.correct()
+      toast('החבר התחבר')
+    } catch {
+      invite.current?.cancel()
+      toast('החיבור לא הצליח. בדקו שאתם על אותה רשת ונסו שוב')
+    }
+    invite.current = null
+    setStep('idle')
+  }
+  const cancel = () => {
+    invite.current?.cancel()
+    invite.current = null
+    setStep('idle')
+  }
+
+  if (step === 'idle')
+    return (
+      <div className="card col">
+        <div style={{ fontWeight: 800 }}>📡 חדר בלי אינטרנט</div>
+        <div className="muted small">כל חבר לוחץ אצלו ״חברים״ ← ״בלי אינטרנט״ ← ״הצטרף לחבר״, ואז מחברים אותו כאן.</div>
+        <button className="btn" onClick={start}>
+          ➕ חבר טלפון
+        </button>
+      </div>
+    )
+  if (step === 'prep' || step === 'link')
+    return <div className="card center muted">{step === 'prep' ? 'מכין קוד…' : 'מתחבר…'}</div>
+  return (
+    <div className="card col" style={{ alignItems: 'stretch' }}>
+      {step === 'show' ? (
+        <>
+          <div style={{ fontWeight: 800 }}>1. החבר סורק את הקוד הזה</div>
+          <QRCode text={invite.current!.code} />
+          <button className="btn primary" onClick={() => setStep('scan')}>
+            הוא סרק. עכשיו אני סורק אותו
+          </button>
+        </>
+      ) : (
+        <>
+          <div style={{ fontWeight: 800 }}>2. סרוק את הקוד שעל המסך של החבר</div>
+          <QRScanner accept={isReply} onCode={onReply} />
+          <button className="btn" onClick={() => setStep('show')}>
+            חזרה לקוד שלי
+          </button>
+        </>
+      )}
+      <button className="link-btn small" onClick={cancel}>
+        ביטול
+      </button>
+    </div>
+  )
+}
+
+export function NearbyJoin() {
+  const nav = useNav()
+  const [step, setStep] = useState<'scan' | 'prep' | 'show' | 'fail'>('scan')
+  const [reply, setReply] = useState('')
+  const guest = useRef<NearbyGuest | null>(null)
+  // leaving this screen before the room opens drops the half-made connection
+  useEffect(() => () => {
+    if (guest.current && nearbyRole() !== 'guest') guest.current.close()
+  }, [])
+
+  const onInvite = async (text: string) => {
+    setStep('prep')
+    await unlockLocalAddress()
+    const g = new NearbyGuest()
+    guest.current = g
+    try {
+      setReply(await g.answer(text))
+      setStep('show')
+    } catch {
+      setStep('fail')
+      return
+    }
+    const room = await Promise.race([g.connected(), new Promise<null>((r) => setTimeout(() => r(null), 180000))])
+    if (!room) return setStep('fail')
+    setTransport(g)
+    g.onLost = () => {
+      toast('החיבור לטלפון של המארח נותק')
+      setTransport(null)
+      nav.tab('home')
+    }
+    const r = await joinRoom(room.code)
+    if (r === 'ok') return nav.replace({ name: 'room', params: { code: room.code } })
+    toast(r === 'full' ? 'החדר מלא' : r === 'started' ? 'המשחק בחדר כבר התחיל' : 'לא הצלחתי להיכנס לחדר')
+    setTransport(null)
+    setStep('fail')
+  }
+
+  return (
+    <div className="screen full">
+      <TopBar title="הצטרפות בלי אינטרנט" />
+      {step === 'scan' && (
+        <>
+          <div className="card col">
+            <div style={{ fontWeight: 800 }}>1. סרוק את הקוד במסך של המארח</div>
+            <div className="muted small">המארח לוחץ אצלו ״חבר טלפון״ בחדר.</div>
+          </div>
+          <QRScanner accept={isInvite} onCode={onInvite} />
+        </>
+      )}
+      {step === 'prep' && <div className="card center muted">מכין קוד תשובה…</div>}
+      {step === 'show' && (
+        <div className="card col" style={{ alignItems: 'stretch' }}>
+          <div style={{ fontWeight: 800 }}>2. עכשיו המארח סורק את הקוד הזה</div>
+          <QRCode text={reply} />
+          <div className="center muted small">ממתין לחיבור…</div>
+        </div>
+      )}
+      {step === 'fail' && (
+        <div className="card col">
+          <div style={{ fontWeight: 800 }}>החיבור לא הצליח</div>
+          <NearbySteps />
+          <button
+            className="btn primary"
+            onClick={() => {
+              guest.current?.close()
+              guest.current = null
+              setStep('scan')
+            }}
+          >
+            נסה שוב
+          </button>
+        </div>
+      )}
     </div>
   )
 }
