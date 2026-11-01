@@ -51,7 +51,7 @@ for (const topic of TOPICS) {
       const norm = it.q.replace(/\s+/g, ' ').trim()
       if (seenQ.has(norm)) fail(where, `same question as ${seenQ.get(norm)}`)
       seenQ.set(norm, where)
-      out.push({ id: `${topic}-${String(out.length + 1).padStart(3, '0')}`, topic, level: LEVEL[it.l], type: TYPE[it.t], q: it.q.trim(), a: it.a.trim(), w: it.w.map((s) => s.trim()), ...(it.x ? { ex: it.x.trim() } : {}), ...qImages.get(norm) })
+      out.push({ id: `${topic}-${createHash('sha1').update(norm).digest('hex').slice(0, 8)}`, topic, level: LEVEL[it.l], type: TYPE[it.t], q: it.q.trim(), a: it.a.trim(), w: it.w.map((s) => s.trim()), ...(it.x ? { ex: it.x.trim() } : {}), ...qImages.get(norm) })
     })
   }
   writeFileSync(join(OUT, `questions-${topic}.json`), JSON.stringify(out))

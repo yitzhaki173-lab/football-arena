@@ -1,3 +1,4 @@
+import type { Items } from '../data/content'
 import type { GameConfig, ScratchEntry } from '../types'
 
 export type RoomKind = 'room' | 'tournament' | 'duel' | 'challenge'
@@ -23,6 +24,8 @@ export interface RoomPlayer {
   done: boolean
   /** tournament: sum of normalized round scores */
   total: number
+  /** Ids this phone showed lately, comma separated, so the host can pick fresh ones. */
+  recent?: string
 }
 
 export interface RoundRecord {
@@ -45,6 +48,10 @@ export interface RoomState {
   plan?: GameConfig[]
   players: Record<string, RoomPlayer>
   history?: Record<string, RoundRecord>
+  /** The round's questions or pictures, picked once by the host so every phone shows the same. */
+  items?: Items | null
+  /** Ids already used in this room, comma separated. */
+  used?: string | null
   custom?: ScratchEntry | null
   /** set by whoever wrote the personal puzzle */
   customBy?: string | null

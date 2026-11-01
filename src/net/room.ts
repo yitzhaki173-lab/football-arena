@@ -1,5 +1,5 @@
-import { randomSeed } from '../data/content'
-import { getProfile } from '../game/profile'
+import { loadContent, randomSeed, selectItems, type Items, type SeenMap } from '../data/content'
+import { getProfile, recentSeen } from '../game/profile'
 import type { GameConfig, GameMode, Level, TopicId } from '../types'
 import { createFirebaseTransport, markLeaveOnDisconnect, type FirebaseWebConfig } from './firebase'
 import { LocalTransport } from './local'
@@ -55,7 +55,28 @@ export async function watchDisconnect(code: string) {
 function newPlayer(): RoomPlayer {
   const p = getProfile()
   const now = Date.now()
-  return { id: myId(), name: p.nickname, avatar: p.avatar, xp: p.xp, joinedAt: now, last: now, progress: 0, score: 0, norm: 0, correct: 0, ms: 0, done: false, total: 0 }
+  return { id: myId(), name: p.nickname, avatar: p.avatar, xp: p.xp, joinedAt: now, last: now, progress: 0, score: 0, norm: 0, correct: 0, ms: 0, done: false, total: 0, recent: recentSeen(300).join(',') }
+}
+
+/**
+ * Picks the round's items on the host so they are fresh for everyone: what this phone saw,
+ * what the others reported when they joined, and what this room already played all go last.
+ */
+async function pickRoomItems(room: Pick<RoomState, 'players' | 'used'>, config: GameConfig, seed: number): Promise<Items> {
+  const content = await loadContent()
+  const now = Date.now()
+  const seen: SeenMap = { ...getProfile().seenAt }
+  for (const p of Object.values(room.players ?? {})) {
+    if (p.id === myId() || !p.recent) continue
+    // their list is newest first; older ones get older times so they come back first
+    p.recent.split(',').forEach((id, k) => (seen[id] = Math.max(seen[id] ?? 0, now - 1000 - k)))
+  }
+  for (const id of (room.used ?? '').split(',')) if (id) seen[id] = now
+  return selectItems(content, config, seed, seen)
+}
+
+function addUsed(used: string | null | undefined, items: Items): string {
+  return [...(used ? used.split(',') : []), ...items.list.map((x) => x.id)].slice(-400).join(',')
 }
 
 function newCode(): string {
@@ -99,6 +120,9 @@ export async function createRoom(kind: RoomKind, config: GameConfig): Promise<st
   let code = newCode()
   for (let i = 0; i < 5 && (await t.get(code)); i++) code = newCode()
   const me = newPlayer()
+  const seed = randomSeed()
+  // a challenge starts right away, so its items are picked now
+  const items = kind === 'challenge' ? await pickRoomItems({ players: { [me.id]: me } }, config, seed) : null
   const room: RoomState = {
     code,
     kind,
@@ -106,9 +130,11 @@ export async function createRoom(kind: RoomKind, config: GameConfig): Promise<st
     createdAt: Date.now(),
     status: kind === 'challenge' ? 'playing' : 'lobby',
     round: kind === 'challenge' ? 1 : 0,
-    seed: randomSeed(),
+    seed,
     config,
     players: { [me.id]: me },
+    items,
+    used: items ? addUsed(null, items) : null,
     custom: null,
     customBy: null,
   }
@@ -182,13 +208,17 @@ export async function startRound(room: RoomState, hasScratch: boolean) {
     config = plan[Math.min(round - 1, plan.length - 1)]
   }
   const useCustom = !!room.custom && config.mode === 'scratch'
+  const seed = randomSeed()
+  const items = useCustom ? null : await pickRoomItems(room, config, seed)
   await t.patch(room.code, {
     ...resetRoundFields(room, useCustom ? (room.customBy ?? null) : null),
     status: 'playing',
     round,
-    seed: randomSeed(),
+    seed,
     config,
     plan: plan ?? null,
+    items,
+    used: items ? addUsed(room.used, items) : (room.used ?? null),
   })
 }
 
@@ -274,7 +304,7 @@ export async function updateRoomConfig(code: string, config: GameConfig) {
 
 export async function backToLobby(room: RoomState) {
   const t = (await getTransport())!
-  const u: Record<string, unknown> = { ...resetRoundFields(room, null), status: 'lobby', round: 0, plan: null, history: null }
+  const u: Record<string, unknown> = { ...resetRoundFields(room, null), status: 'lobby', round: 0, plan: null, history: null, items: null }
   for (const p of Object.values(room.players ?? {})) {
     u[`players/${p.id}/out`] = null
     u[`players/${p.id}/total`] = 0

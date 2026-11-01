@@ -19,7 +19,8 @@ export interface Profile {
   whoFirstClue: number
   achievements: string[]
   history: GameResult[]
-  seen: string[]
+  /** When each question, player or picture was last shown here (ms), so it does not come back soon. */
+  seenAt: Record<string, number>
   reported: string[]
   settings: { sound: boolean; vibrate: boolean }
   /** Friends' last known scores, keyed by nickname, from rooms played together. */
@@ -44,7 +45,7 @@ const empty: Profile = {
   whoFirstClue: 0,
   achievements: [],
   history: [],
-  seen: [],
+  seenAt: {},
   reported: [],
   settings: { sound: true, vibrate: true },
   friends: {},
@@ -54,8 +55,10 @@ function read(): Profile {
   try {
     const raw = localStorage.getItem(KEY)
     if (!raw) return { ...empty }
-    const p = JSON.parse(raw) as Partial<Profile>
-    return { ...empty, ...p, settings: { ...empty.settings, ...p.settings } }
+    const p = JSON.parse(raw) as Partial<Profile> & { seen?: unknown }
+    // the old `seen` list keyed questions by position, which changes when questions are removed
+    delete p.seen
+    return { ...empty, ...p, seenAt: p.seenAt ?? {}, settings: { ...empty.settings, ...p.settings } }
   } catch {
     return { ...empty }
   }
@@ -131,7 +134,7 @@ export function recordGame(r: GameResult, extras: RecordExtras = {}): { xp: numb
   const xp = xpFor(r)
   let unlocked: string[] = []
   updateProfile((p) => {
-    const seen = [...new Set([...(extras.seenIds ?? []), ...p.seen])].slice(0, 1500)
+    const seenAt = markSeen(p.seenAt, extras.seenIds ?? [])
     const next: Profile = {
       ...p,
       xp: p.xp + xp,
@@ -146,13 +149,39 @@ export function recordGame(r: GameResult, extras: RecordExtras = {}): { xp: numb
       scratchUnder10: p.scratchUnder10 + (extras.scratchUnder10 ?? 0),
       whoFirstClue: p.whoFirstClue + (extras.whoFirstClue ?? 0),
       history: [r, ...p.history].slice(0, 40),
-      seen,
+      seenAt,
     }
     unlocked = checkAchievements(next).filter((id) => !p.achievements.includes(id))
     next.achievements = [...p.achievements, ...unlocked]
     return next
   })
   return { xp, unlocked }
+}
+
+const SEEN_CAP = 6000
+
+function markSeen(prev: Record<string, number>, ids: string[]): Record<string, number> {
+  if (!ids.length) return prev
+  const now = Date.now()
+  const next = { ...prev }
+  ids.forEach((id, k) => (next[id] = now + k))
+  const keys = Object.keys(next)
+  if (keys.length <= SEEN_CAP) return next
+  keys.sort((a, b) => next[b] - next[a])
+  return Object.fromEntries(keys.slice(0, SEEN_CAP).map((k) => [k, next[k]]))
+}
+
+/** Remembers items shown in a game that is not saved through recordGame (a room round). */
+export function rememberSeen(ids: string[]) {
+  updateProfile((p) => ({ ...p, seenAt: markSeen(p.seenAt, ids) }))
+}
+
+/** The ids this phone showed most recently, newest first, for a room host to avoid. */
+export function recentSeen(n: number): string[] {
+  const s = state.seenAt
+  return Object.keys(s)
+    .sort((a, b) => s[b] - s[a])
+    .slice(0, n)
 }
 
 export function reportQuestion(id: string) {

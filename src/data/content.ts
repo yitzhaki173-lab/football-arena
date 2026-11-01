@@ -1,4 +1,4 @@
-import type { Level, Question, ScratchEntry, TopicId, WhoEntry } from '../types'
+import type { GameConfig, Level, Question, ScratchEntry, TopicId, WhoEntry } from '../types'
 import { TOPICS } from './meta'
 
 /**
@@ -39,9 +39,14 @@ export function loadContent(): Promise<Content> {
 
 const LEVEL_ORDER: Level[] = ['medium', 'hard', 'expert']
 
+/** When each item was last shown on this phone (ms), keyed by id. Missing means never. */
+export type SeenMap = Record<string, number>
+
 /**
- * Picks `count` items from the chosen topics at the requested level. If the level runs short,
- * it fills from the neighbouring levels. Items not in `avoid` come first.
+ * Picks `count` items from the chosen topics, freshest first: items this phone never showed
+ * come before anything it did, and of those it did, the ones shown longest ago come first.
+ * An unseen item one level away beats a repeat at the requested level; two levels away only
+ * after the repeats at the requested level.
  */
 export function pickItems<T extends { id: string; topic: TopicId; alt?: TopicId[]; level: Level }>(
   all: T[],
@@ -49,22 +54,31 @@ export function pickItems<T extends { id: string; topic: TopicId; alt?: TopicId[
   level: Level,
   count: number,
   rand: () => number,
-  avoid: Set<string> = new Set(),
+  seen: SeenMap = {},
 ): T[] {
   const inTopic = all.filter((x) => !topics.length || topics.includes(x.topic) || !!x.alt?.some((t) => topics.includes(t)))
   const li = LEVEL_ORDER.indexOf(level)
-  const byDistance = [...LEVEL_ORDER].sort((a, b) => Math.abs(LEVEL_ORDER.indexOf(a) - li) - Math.abs(LEVEL_ORDER.indexOf(b) - li))
-  const out: T[] = []
-  for (const lv of byDistance) {
-    const pool = shuffle(inTopic.filter((x) => x.level === lv), rand)
-    pool.sort((a, b) => Number(avoid.has(a.id)) - Number(avoid.has(b.id)))
-    for (const item of pool) {
-      if (out.length >= count) break
-      out.push(item)
-    }
-    if (out.length >= count) break
+  const dist = (x: T) => Math.abs(LEVEL_ORDER.indexOf(x.level) - li)
+  // tiers: unseen here, unseen next level, repeats here, unseen two away, repeats next level, repeats two away
+  const tier = (x: T) => (seen[x.id] ? [2, 4, 5][dist(x)] : [0, 1, 3][dist(x)])
+  return shuffle(inTopic, rand)
+    .map((x) => ({ x, t: tier(x), at: seen[x.id] ?? 0 }))
+    .sort((a, b) => a.t - b.t || a.at - b.at)
+    .slice(0, count)
+    .map((e) => e.x)
+}
+
+export type Items = { kind: 'q'; list: Question[] } | { kind: 'who'; list: WhoEntry[] } | { kind: 'scratch'; list: ScratchEntry[] }
+
+/** The items for one game. With the same seed and seen-map every phone gets the same list. */
+export function selectItems(content: Content, cfg: GameConfig, seed: number, seen?: SeenMap): Items {
+  const r = seeded(seed)
+  if (cfg.mode === 'who') return { kind: 'who', list: pickItems(content.who, cfg.topics, cfg.level, cfg.count, r, seen) }
+  if (cfg.mode === 'scratch') {
+    const pool = content.scratch.filter((s) => !cfg.scratchKind || cfg.scratchKind === 'mixed' || s.kind === cfg.scratchKind)
+    return { kind: 'scratch', list: pickItems(pool, cfg.topics, cfg.level, cfg.count, r, seen) }
   }
-  return out
+  return { kind: 'q', list: pickItems(content.questions, cfg.topics, cfg.level, cfg.count, r, seen) }
 }
 
 export function shuffle<T>(arr: T[], rand: () => number): T[] {

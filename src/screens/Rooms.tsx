@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { AVATARS, LEVELS, levelName, modeName, topicsName } from '../data/meta'
 import { loadContent } from '../data/content'
 import { fx } from '../game/feedback'
-import { recordGame, rememberFriends, useProfile } from '../game/profile'
+import { recordGame, rememberFriends, rememberSeen, useProfile } from '../game/profile'
 import {
   activePlayers,
   backToLobby,
@@ -326,9 +326,13 @@ export function Room({ code }: { code: string }) {
         config={room.config}
         seed={room.seed}
         shared
+        fixed={room.items}
         custom={room.config.mode === 'scratch' ? room.custom : null}
         onProgress={(p) => reportProgress(code, p)}
-        onDone={(o) => reportDone(code, o)}
+        onDone={(o) => {
+          rememberSeen(o.seenIds)
+          reportDone(code, o)
+        }}
         onQuit={quit}
       />
     )

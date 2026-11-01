@@ -1,26 +1,13 @@
 import { useEffect, useState } from 'react'
-import { loadContent, pickItems, seeded, type Content } from '../data/content'
+import { loadContent, selectItems, type Items } from '../data/content'
 import { recordGame, getProfile } from '../game/profile'
 import type { GameOutcome } from '../game/types'
-import type { GameConfig, Question, ScratchEntry, WhoEntry } from '../types'
+import type { GameConfig, ScratchEntry } from '../types'
 import { useNav } from '../nav'
 import { TopBar } from '../components/ui'
 import { Trivia } from './games/Trivia'
 import { Who } from './games/Who'
 import { Scratch } from './games/Scratch'
-
-type Items = { kind: 'q'; list: Question[] } | { kind: 'who'; list: WhoEntry[] } | { kind: 'scratch'; list: ScratchEntry[] }
-
-/** Picks the same items on every phone for a given config + seed. */
-export function selectItems(content: Content, cfg: GameConfig, seed: number, avoid?: Set<string>): Items {
-  const r = seeded(seed)
-  if (cfg.mode === 'who') return { kind: 'who', list: pickItems(content.who, cfg.topics, cfg.level, cfg.count, r, avoid) }
-  if (cfg.mode === 'scratch') {
-    const pool = content.scratch.filter((s) => !cfg.scratchKind || cfg.scratchKind === 'mixed' || s.kind === cfg.scratchKind)
-    return { kind: 'scratch', list: pickItems(pool, cfg.topics, cfg.level, cfg.count, r, avoid) }
-  }
-  return { kind: 'q', list: pickItems(content.questions, cfg.topics, cfg.level, cfg.count, r, avoid) }
-}
 
 export function GameHost({
   config,
@@ -29,6 +16,7 @@ export function GameHost({
   onProgress,
   onQuit,
   shared,
+  fixed,
   custom,
 }: {
   config: GameConfig
@@ -38,6 +26,8 @@ export function GameHost({
   onQuit?: () => void
   /** In a room everyone must get the same items, so seen-history is ignored. */
   shared?: boolean
+  /** Items the room host already picked for this round. */
+  fixed?: Items | null
   /** A personal scratch puzzle a friend made for the room. */
   custom?: ScratchEntry | null
 }) {
@@ -51,8 +41,11 @@ export function GameHost({
         setItems({ kind: 'scratch', list: [custom] })
         return
       }
-      const avoid = shared ? undefined : new Set(getProfile().seen)
-      setItems(selectItems(c, config, seed, avoid))
+      if (fixed?.list?.length) {
+        setItems(fixed)
+        return
+      }
+      setItems(selectItems(c, config, seed, shared ? undefined : getProfile().seenAt))
     })
     return () => {
       live = false
