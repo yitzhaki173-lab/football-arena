@@ -123,7 +123,8 @@ if (existsSync(playersSrc)) {
       }
       who.push({ id: `who-${p.id}`, ...common, answer: p.answer, clues: p.clues, w: p.w, img })
     }
-    scratch.push({ id: `scr-${p.id}`, ...common, kind: 'player', name: base.scratch, img })
+    // label and w let scratch be played with six options instead of letters
+    scratch.push({ id: `scr-${p.id}`, ...common, kind: 'player', name: base.scratch, img, label: base.answer, w: base.w })
   }
 }
 writeFileSync(join(OUT, 'who.json'), JSON.stringify(who))

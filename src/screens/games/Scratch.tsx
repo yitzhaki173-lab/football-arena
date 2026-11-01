@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
-import { seeded, shuffle } from '../../data/content'
+import { arrangeAnswers, seeded, shuffle } from '../../data/content'
 import { ScratchCanvas } from '../../components/ScratchCanvas'
 import { fx } from '../../game/feedback'
 import { reportQuestion } from '../../game/profile'
@@ -60,15 +60,21 @@ export function Scratch({ config, items, seed, onDone, onProgress, onQuit }: Gam
   const msTotal = config.seconds * 1000
   const puzzles = useMemo(() => {
     const r = seeded(seed + 23)
-    return items.map((e) => ({ puzzle: buildPuzzle(e.name, e.level, r), frame: framing(e.level, r) }))
-  }, [items, seed])
+    return items.map((e) => ({
+      puzzle: buildPuzzle(e.name, e.level, r),
+      frame: framing(e.level, r),
+      // six options when asked for and the picture has wrong answers (a friend's own puzzle does not)
+      choices: config.scratchAnswer === 'choices' && (e.w?.length ?? 0) >= 5 ? arrangeAnswers({ a: e.label ?? e.name, w: e.w! }, r) : null,
+    }))
+  }, [items, seed, config.scratchAnswer])
 
   const [i, setI] = useState(0)
   const [slots, setSlots] = useState<Slot[]>(() => puzzles[0]?.puzzle.slots ?? [])
   const [pct, setPct] = useState(0)
   const [allow, setAllow] = useState(STEP)
   const [helps, setHelps] = useState(0)
-  const [done, setDone] = useState<null | 'ok' | 'skip' | 'time'>(null)
+  const [done, setDone] = useState<null | 'ok' | 'skip' | 'time' | 'wrong'>(null)
+  const [picked, setPicked] = useState<number | null>(null)
   const [shake, setShake] = useState(false)
   const [gained, setGained] = useState(0)
   const stats = useRef({ score: 0, norm: 0, correct: 0, streak: 0, best: 0, ms: 0, under10: 0 })
@@ -78,7 +84,7 @@ export function Scratch({ config, items, seed, onDone, onProgress, onQuit }: Gam
   const pool = pz?.puzzle.pool ?? []
   const used = new Set(slots.filter((s) => s.tile >= 0).map((s) => s.tile))
 
-  const finish = (kind: 'ok' | 'skip' | 'time') => {
+  const finish = (kind: 'ok' | 'skip' | 'time' | 'wrong') => {
     if (done) return
     const s = stats.current
     const pts = kind === 'ok' ? scratchPoints(pct, helps) : 0
@@ -93,7 +99,7 @@ export function Scratch({ config, items, seed, onDone, onProgress, onQuit }: Gam
       fx.correct()
     } else {
       s.streak = 0
-      if (kind === 'time') fx.wrong()
+      if (kind === 'time' || kind === 'wrong') fx.wrong()
     }
     setGained(pts)
     setDone(kind)
@@ -181,7 +187,15 @@ export function Scratch({ config, items, seed, onDone, onProgress, onQuit }: Gam
     setHelps(0)
     setPct(0)
     setAllow(STEP)
+    setPicked(null)
     setDone(null)
+  }
+
+  // one try only, so the options cannot be tapped through
+  const choose = (k: number) => {
+    if (done || !pz.choices) return
+    setPicked(k)
+    finish(k === pz.choices.correct ? 'ok' : 'wrong')
   }
 
   if (!e) return null
@@ -214,31 +228,53 @@ export function Scratch({ config, items, seed, onDone, onProgress, onQuit }: Gam
         <Timer msLeft={done ? 0 : timer.left} msTotal={msTotal} />
       </div>
 
-      <div className={`slots ${shake ? 'shake' : ''}`}>
-        {words.map((w, wi) => (
-          <div className="word" key={wi}>
-            {w.map(({ slot, k }) => (
-              <button key={k} className={`slot ${slot.tile >= 0 || slot.fixed ? 'filled' : ''} ${slot.hint ? 'hint' : ''}`} onClick={() => tapSlot(k)}>
-                {done && done !== 'ok' ? slot.ch : slot.fixed ? slot.ch : slot.tile >= 0 ? pool[slot.tile] : ''}
+      {pz.choices ? (
+        <div className="answers">
+          {pz.choices.options.map((opt, k) => {
+            let cls = 'answer'
+            if (done) {
+              if (k === pz.choices!.correct) cls += ' correct'
+              else if (k === picked) cls += ' wrong'
+              else cls += ' dim'
+            }
+            return (
+              <button key={k} className={cls} onClick={() => choose(k)} disabled={!!done}>
+                {opt}
               </button>
-            ))}
-          </div>
-        ))}
-      </div>
+            )
+          })}
+        </div>
+      ) : (
+        <div className={`slots ${shake ? 'shake' : ''}`}>
+          {words.map((w, wi) => (
+            <div className="word" key={wi}>
+              {w.map(({ slot, k }) => (
+                <button key={k} className={`slot ${slot.tile >= 0 || slot.fixed ? 'filled' : ''} ${slot.hint ? 'hint' : ''}`} onClick={() => tapSlot(k)}>
+                  {done && done !== 'ok' ? slot.ch : slot.fixed ? slot.ch : slot.tile >= 0 ? pool[slot.tile] : ''}
+                </button>
+              ))}
+            </div>
+          ))}
+        </div>
+      )}
 
       {!done ? (
         <>
-          <div className="pool">
-            {pool.map((c, t) => (
-              <button key={t} className={`tile-letter ${used.has(t) ? 'used' : ''}`} onClick={() => tapTile(t)}>
-                {c}
-              </button>
-            ))}
-          </div>
+          {!pz.choices && (
+            <div className="pool">
+              {pool.map((c, t) => (
+                <button key={t} className={`tile-letter ${used.has(t) ? 'used' : ''}`} onClick={() => tapTile(t)}>
+                  {c}
+                </button>
+              ))}
+            </div>
+          )}
           <div className="row">
-            <button className="btn grow" onClick={help}>
-              💡 עזרה (−15%)
-            </button>
+            {!pz.choices && (
+              <button className="btn grow" onClick={help}>
+                💡 עזרה (−15%)
+              </button>
+            )}
             <button className="btn ghost grow" onClick={() => finish('skip')}>
               דלג
             </button>
@@ -248,8 +284,8 @@ export function Scratch({ config, items, seed, onDone, onProgress, onQuit }: Gam
         <>
           <div className="row">
             <div className="grow" style={{ fontWeight: 800, fontSize: 18 }}>
-              {done === 'ok' ? <span className="points-pop">+{gained}</span> : done === 'time' ? 'נגמר הזמן' : 'דילגת'}
-              <div className="muted small" style={{ fontWeight: 600 }}>{e.name}</div>
+              {done === 'ok' ? <span className="points-pop">+{gained}</span> : done === 'time' ? 'נגמר הזמן' : done === 'wrong' ? 'לא נכון' : 'דילגת'}
+              <div className="muted small" style={{ fontWeight: 600 }}>{e.label ?? e.name}</div>
             </div>
             <button
               className="badge"

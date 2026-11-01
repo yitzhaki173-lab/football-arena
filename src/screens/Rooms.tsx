@@ -31,7 +31,7 @@ import type { RoomKind, RoomPlayer, RoomState } from '../net/types'
 import type { GameConfig, GameMode, Level, TopicId } from '../types'
 import { useNav } from '../nav'
 import { TopBar, toast } from '../components/ui'
-import { ConfigForm, TopicPicker, defaultConfig } from './Setup'
+import { ConfigForm, ScratchAnswerPicker, TopicPicker, defaultConfig } from './Setup'
 import { GameHost } from './Play'
 
 const KIND_NAME: Record<RoomKind, string> = { room: 'חדר', tournament: 'טורניר', duel: 'ראש בראש', challenge: 'אתגר בקישור' }
@@ -160,7 +160,14 @@ export function RoomCreate({ tournament, duel, challenge }: { tournament?: boole
         </div>
       </div>
       {kind === 'tournament' ? (
-        <TournamentForm topics={cfg.topics} level={cfg.level} modes={cfg.modes ?? TOURNAMENT_MODES} onChange={(topics, level, modes) => setCfg({ ...cfg, topics, level, modes })} />
+        <TournamentForm
+          topics={cfg.topics}
+          level={cfg.level}
+          modes={cfg.modes ?? TOURNAMENT_MODES}
+          scratchAnswer={cfg.scratchAnswer}
+          onChange={(topics, level, modes) => setCfg({ ...cfg, topics, level, modes })}
+          onScratchAnswer={(scratchAnswer) => setCfg({ ...cfg, scratchAnswer })}
+        />
       ) : (
         <ConfigForm value={cfg} onChange={setCfg} lockMode={false} />
       )}
@@ -176,12 +183,16 @@ function TournamentForm({
   topics,
   level,
   modes,
+  scratchAnswer,
   onChange,
+  onScratchAnswer,
 }: {
   topics: TopicId[]
   level: Level
   modes: GameMode[]
+  scratchAnswer?: GameConfig['scratchAnswer']
   onChange: (t: TopicId[], l: Level, m: GameMode[]) => void
+  onScratchAnswer: (v: 'letters' | 'choices') => void
 }) {
   const toggle = (m: GameMode) => {
     const next = modes.includes(m) ? modes.filter((x) => x !== m) : [...modes, m]
@@ -202,6 +213,7 @@ function TournamentForm({
           ))}
         </div>
       </div>
+      {modes.includes('scratch') && <ScratchAnswerPicker value={scratchAnswer} onChange={onScratchAnswer} />}
       <div>
         <div className="label">נושאים · אפשר לסמן כמה</div>
         <TopicPicker compact value={topics} onChange={(t) => onChange(t, level, modes)} />

@@ -115,5 +115,227 @@
     0.43
    ]
   ]
+ },
+ "314_Nicolas_Anelka.jpg": {
+  "crop": [
+   0,
+   0,
+   0.55,
+   1
+  ]
+ },
+ "319_Michael_Essien.jpg": {
+  "crop": [
+   0,
+   0,
+   0.5,
+   1
+  ]
+ },
+ "332_Jordan_Henderson.jpg": {
+  "crop": [
+   0,
+   0,
+   0.55,
+   1
+  ]
+ },
+ "335_Joe_Allen.jpg": {
+  "crop": [
+   0.4,
+   0,
+   1,
+   1
+  ]
+ },
+ "355_Jarrod_Bowen.jpg": {
+  "crop": [
+   0.5,
+   0,
+   1,
+   1
+  ]
+ },
+ "393_Adil_Rami.jpg": {
+  "crop": [
+   0,
+   0,
+   0.6,
+   1
+  ]
+ },
+ "400_Nabil_Fekir.jpg": {
+  "crop": [
+   0.45,
+   0,
+   1,
+   1
+  ]
+ },
+ "404_Yeremy_Pino.jpg": {
+  "crop": [
+   0.4,
+   0,
+   1,
+   1
+  ]
+ },
+ "407_Alexander_Sorloth.jpg": {
+  "crop": [
+   0,
+   0,
+   0.55,
+   1
+  ]
+ },
+ "410_Unai_Simon.jpg": {
+  "crop": [
+   0,
+   0,
+   0.65,
+   1
+  ]
+ },
+ "411_Gianluigi_Buffon.jpg": {
+  "crop": [
+   0.45,
+   0,
+   1,
+   1
+  ]
+ },
+ "426_Weston_McKennie.jpg": {
+  "crop": [
+   0,
+   0,
+   0.55,
+   1
+  ]
+ },
+ "431_Hakan_Calhanoglu.jpg": {
+  "blur": [
+   [
+    0,
+    0.72,
+    0.8,
+    0.98
+   ]
+  ]
+ },
+ "441_Samuel_Chukwueze.jpg": {
+  "crop": [
+   0.4,
+   0.1,
+   0.95,
+   1
+  ]
+ },
+ "446_Duvan_Zapata.jpg": {
+  "crop": [
+   0,
+   0,
+   0.55,
+   1
+  ]
+ },
+ "455_Matteo_Politano.jpg": {
+  "blur": [
+   [
+    0,
+    0.68,
+    0.5,
+    1
+   ]
+  ]
+ },
+ "460_Moise_Kean.jpg": {
+  "crop": [
+   0.45,
+   0,
+   1,
+   1
+  ]
+ },
+ "474_Joshua_Kimmich.jpg": {
+  "crop": [
+   0.45,
+   0,
+   1,
+   1
+  ]
+ },
+ "481_Eric_Maxim_Choupo_Moting.jpg": {
+  "crop": [
+   0,
+   0,
+   0.62,
+   1
+  ]
+ },
+ "495_Nico_Schlotterbeck.jpg": {
+  "crop": [
+   0,
+   0,
+   0.55,
+   1
+  ]
+ },
+ "496_Emre_Can.jpg": {
+  "crop": [
+   0,
+   0.2,
+   0.62,
+   1
+  ]
+ },
+ "500_Emil_Forsberg.jpg": {
+  "crop": [
+   0.55,
+   0,
+   1,
+   1
+  ]
+ },
+ "503_Benjamin_Sesko.jpg": {
+  "crop": [
+   0.6,
+   0,
+   1,
+   1
+  ]
+ },
+ "550_Yusuf_Yazici.jpg": {
+  "crop": [
+   0.35,
+   0,
+   1,
+   1
+  ]
+ },
+ "553_Leny_Yoro.jpg": {
+  "crop": [
+   0.35,
+   0,
+   0.85,
+   1
+  ]
+ },
+ "558_Moses_Simon.jpg": {
+  "blur": [
+   [
+    0.6,
+    0.35,
+    0.95,
+    0.6
+   ]
+  ]
+ },
+ "569_William_Saliba.jpg": {
+  "crop": [
+   0.55,
+   0,
+   1,
+   1
+  ]
  }
 }

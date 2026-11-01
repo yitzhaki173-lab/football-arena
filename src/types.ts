@@ -40,6 +40,9 @@ export interface ScratchEntry {
   /** The name the player completes from letter tiles. */
   name: string
   img: string
+  /** For answering from six options: the name as shown, and five wrong ones. */
+  label?: string
+  w?: string[]
 }
 
 export type GameMode = 'trivia' | 'quick' | 'who' | 'scratch'
@@ -52,6 +55,8 @@ export interface GameConfig {
   count: number
   seconds: number
   scratchKind?: 'player' | 'team' | 'mixed'
+  /** Scratch: build the name from letters, or pick it from six options. */
+  scratchAnswer?: 'letters' | 'choices'
   /** Tournament only: the games its rounds rotate through. */
   modes?: GameMode[]
 }

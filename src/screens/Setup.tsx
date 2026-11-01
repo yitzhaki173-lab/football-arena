@@ -12,7 +12,7 @@ export function defaultConfig(mode: GameMode): GameConfig {
     case 'who':
       return { mode, topics: ALL_TOPICS, level: 'medium', count: 5, seconds: 45 }
     case 'scratch':
-      return { mode, topics: ALL_TOPICS, level: 'medium', count: 5, seconds: 60, scratchKind: 'mixed' }
+      return { mode, topics: ALL_TOPICS, level: 'medium', count: 5, seconds: 60, scratchKind: 'mixed', scratchAnswer: 'letters' }
     default:
       return { mode: 'trivia', topics: ALL_TOPICS, level: 'medium', count: 10, seconds: 15 }
   }
@@ -74,6 +74,22 @@ export function TopicPicker({ value, onChange, compact = false }: { value: Topic
   )
 }
 
+export function ScratchAnswerPicker({ value, onChange }: { value?: GameConfig['scratchAnswer']; onChange: (v: 'letters' | 'choices') => void }) {
+  return (
+    <div>
+      <div className="label">איך עונים בגרד וגלה</div>
+      <div className="chips">
+        <button className={`chip ${value !== 'choices' ? 'on' : ''}`} onClick={() => onChange('letters')}>
+          🔤 מרכיבים את השם
+        </button>
+        <button className={`chip ${value === 'choices' ? 'on' : ''}`} onClick={() => onChange('choices')}>
+          🔘 6 תשובות לבחירה
+        </button>
+      </div>
+    </div>
+  )
+}
+
 export function ConfigForm({ value, onChange, lockMode = true }: { value: GameConfig; onChange: (c: GameConfig) => void; lockMode?: boolean }) {
   const set = (patch: Partial<GameConfig>) => onChange({ ...value, ...patch })
   const counts = value.mode === 'trivia' ? [5, 10, 15] : value.mode === 'quick' ? [5, 10] : [3, 5, 8]
@@ -124,6 +140,7 @@ export function ConfigForm({ value, onChange, lockMode = true }: { value: GameCo
           </div>
         </div>
       )}
+      {value.mode === 'scratch' && <ScratchAnswerPicker value={value.scratchAnswer} onChange={(scratchAnswer) => set({ scratchAnswer })} />}
       <div>
         <div className="label">{value.mode === 'trivia' || value.mode === 'quick' ? 'כמות שאלות' : 'כמות סבבים'}</div>
         <div className="chips">

@@ -90,7 +90,14 @@ export const TOURNAMENT_MODES: GameMode[] = ['trivia', 'who', 'scratch', 'quick'
  * The final is trivia when it was picked; the rounds before it rotate through the
  * other picked games from a random start, so with few players every game still gets its turn.
  */
-export function tournamentPlan(players: number, topics: TopicId[], level: Level, hasScratch: boolean, modes = TOURNAMENT_MODES): GameConfig[] {
+export function tournamentPlan(
+  players: number,
+  topics: TopicId[],
+  level: Level,
+  hasScratch: boolean,
+  modes = TOURNAMENT_MODES,
+  scratchAnswer?: GameConfig['scratchAnswer'],
+): GameConfig[] {
   const rounds = Math.max(1, players - 1)
   let picked = TOURNAMENT_MODES.filter((m) => modes.includes(m) && (m !== 'scratch' || hasScratch))
   if (!picked.length) picked = ['trivia']
@@ -105,7 +112,7 @@ export function tournamentPlan(players: number, topics: TopicId[], level: Level,
       mode === 'who'
         ? { mode, topics, level, count: 3, seconds: 45 }
         : mode === 'scratch'
-          ? { mode, topics, level, count: 3, seconds: 60, scratchKind: 'mixed' }
+          ? { mode, topics, level, count: 3, seconds: 60, scratchKind: 'mixed', scratchAnswer: scratchAnswer ?? 'letters' }
           : mode === 'quick'
             ? { mode, topics, level, count: 5, seconds: 10 }
             : { mode, topics, level: isFinal && level !== 'expert' ? 'hard' : level, count: isFinal ? 7 : 5, seconds: 15 }
@@ -204,7 +211,7 @@ export async function startRound(room: RoomState, hasScratch: boolean) {
   let config = room.config
   let plan = room.plan
   if (room.kind === 'tournament') {
-    if (!plan || room.round === 0) plan = tournamentPlan(activePlayers(room).length, room.config.topics, room.config.level, hasScratch, room.config.modes)
+    if (!plan || room.round === 0) plan = tournamentPlan(activePlayers(room).length, room.config.topics, room.config.level, hasScratch, room.config.modes, room.config.scratchAnswer)
     config = plan[Math.min(round - 1, plan.length - 1)]
   }
   const useCustom = !!room.custom && config.mode === 'scratch'
