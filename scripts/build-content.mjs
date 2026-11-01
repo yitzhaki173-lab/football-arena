@@ -127,6 +127,24 @@ if (existsSync(playersSrc)) {
     scratch.push({ id: `scr-${p.id}`, ...common, kind: 'player', name: base.scratch, img, label: base.answer, w: base.w })
   }
 }
+// club and national team crests: content-src/crests.json, pictures from scripts/build-crest-images.py
+const crestsSrc = join(SRC, 'crests.json')
+if (existsSync(crestsSrc)) {
+  for (const c of JSON.parse(readFileSync(crestsSrc, 'utf8'))) {
+    const where = `crests.json ${c.id}`
+    const file = join(OUT, 'crests', `${c.id}.webp`)
+    if (!existsSync(file)) {
+      fail(where, `missing picture ${file}`)
+      continue
+    }
+    if (!TOPICS.includes(c.topic)) fail(where, `bad topic ${c.topic}`)
+    if (!LEVEL[c.l]) fail(where, `bad level ${c.l}`)
+    if (!/^[א-ת' ]+$/.test(c.scratch ?? '')) fail(where, `scratch name should be Hebrew letters: ${c.scratch}`)
+    checkAnswers(where, c.answer, c.w)
+    const img = `./content/crests/${c.id}.webp?v=${createHash('sha1').update(readFileSync(file)).digest('hex').slice(0, 8)}`
+    scratch.push({ id: `scr-${c.id}`, topic: c.topic, level: LEVEL[c.l], kind: 'team', name: c.scratch, img, label: c.answer, w: c.w })
+  }
+}
 writeFileSync(join(OUT, 'who.json'), JSON.stringify(who))
 writeFileSync(join(OUT, 'scratch.json'), JSON.stringify(scratch))
 

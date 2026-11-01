@@ -4,3 +4,4 @@ dist/
 # The original photos still show names; only the masked WebP copies in public/ are published.
 content-src/players-src/
 __pycache__/
+content-src/crests-src/

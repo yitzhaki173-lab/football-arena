@@ -209,8 +209,8 @@ export function Scratch({ config, items, seed, onDone, onProgress, onQuit }: Gam
   return (
     <div className="screen full">
       <TopBar title={`גרד וגלה · ${i + 1}/${items.length}`} onBack={onQuit} right={<div className="badge">{stats.current.score} נק׳</div>} />
-      <div className={`scratch-wrap${!done && e.level === 'expert' ? ' gray' : ''}`}>
-        <img className="bg" src={e.img} alt="" draggable={false} />
+      <div className={`scratch-wrap${e.kind === 'team' ? ' crest' : ''}${!done && e.level === 'expert' ? ' gray' : ''}`}>
+        {e.kind !== 'team' && <img className="bg" src={e.img} alt="" draggable={false} />}
         <img className="fg" src={e.img} alt="" draggable={false} style={done ? { transition: 'transform .6s, filter .6s' } : pz.frame} />
         <ScratchCanvas brush={BRUSH[e.level]} onReveal={setPct} disabled={!!done} cleared={!!done} resetKey={i} limit={allow} />
         {locked && (
