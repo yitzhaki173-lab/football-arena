@@ -29,11 +29,12 @@ def box(frac, w, h):
 
 def main():
     masks = json.load(open(os.path.join(ROOT, 'content-src', 'player-masks.json')))
+    used = {p['id'] for p in json.load(open(os.path.join(ROOT, 'content-src', 'players.json')))}
     os.makedirs(OUT, exist_ok=True)
     total = 0
     for name in sorted(os.listdir(SRC)):
         pid = image_id(name)
-        if not pid:
+        if not pid or pid not in used:
             continue
         im = Image.open(os.path.join(SRC, name)).convert('RGB')
         w, h = im.size
